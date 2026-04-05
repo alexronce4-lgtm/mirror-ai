@@ -1,0 +1,1491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>MIRROR</title>
+<style>
+/* ─── Reset & base ─────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:       #0a0a0a;
+  --surface:  #111111;
+  --border:   #1e1e1e;
+  --accent:   #00ff88;
+  --accent2:  #44ddff;
+  --dim:      #555555;
+  --text:     #e0e0e0;
+  --muted:    #888888;
+  --low:      #00ff88;
+  --moderate: #ffcc00;
+  --high:     #ff6600;
+  --critical: #ff2222;
+}
+
+html { background: var(--bg); color: var(--text); }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  background-image: radial-gradient(circle, rgba(0,255,136,0.045) 1px, transparent 1px);
+  background-size: 28px 28px;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 36px 16px 80px;
+}
+body::before {
+  content: '';
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent 0%, var(--accent) 30%, var(--accent2) 70%, transparent 100%);
+  z-index: 100;
+  opacity: 0.85;
+}
+
+@keyframes page-fade-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.wrap { width: 100%; max-width: 520px; animation: page-fade-in 0.7s ease forwards; }
+
+/* ─── Header ───────────────────────────────────────────── */
+@keyframes title-glow {
+  0%, 100% { text-shadow: 0 0 10px rgba(0,255,136,0.3), 0 0 30px rgba(0,255,136,0.1); }
+  50%       { text-shadow: 0 0 22px rgba(0,255,136,0.75), 0 0 60px rgba(0,255,136,0.25); }
+}
+header {
+  text-align: center;
+  margin-bottom: 36px;
+}
+header h1 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.35em;
+  color: var(--accent);
+  text-transform: uppercase;
+  animation: title-glow 3s ease-in-out infinite;
+}
+header p {
+  color: var(--dim);
+  font-size: 0.72rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  margin-top: 6px;
+}
+
+/* ─── Upload zone ──────────────────────────────────────── */
+.upload-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.upload-zone {
+  width: 100%;
+  border: 2px dashed rgba(0,255,136,0.22);
+  border-radius: 16px;
+  background: var(--surface);
+  padding: 46px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.25s, background 0.25s, box-shadow 0.25s;
+  position: relative;
+}
+.upload-zone:hover,
+.upload-zone.drag-over {
+  border-color: var(--accent);
+  background: #0d1a12;
+  box-shadow: 0 0 0 4px rgba(0,255,136,0.06), inset 0 0 40px rgba(0,255,136,0.03);
+}
+.upload-zone input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+}
+
+.upload-icon {
+  font-size: 3.2rem;
+  margin-bottom: 16px;
+  opacity: 0.6;
+  filter: drop-shadow(0 0 8px rgba(0,255,136,0.25));
+  transition: opacity 0.2s, filter 0.2s;
+}
+.upload-zone:hover .upload-icon {
+  opacity: 0.9;
+  filter: drop-shadow(0 0 14px rgba(0,255,136,0.5));
+}
+.upload-label {
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.7;
+}
+.upload-label strong {
+  color: var(--text);
+  font-weight: 600;
+  display: block;
+  margin-bottom: 2px;
+}
+
+/* Preview */
+.preview-wrap {
+  display: none;
+  width: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  position: relative;
+}
+.preview-wrap img {
+  width: 100%;
+  max-height: 320px;
+  object-fit: cover;
+  display: block;
+}
+.preview-remove {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(0,0,0,0.7);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s, border-color 0.15s;
+}
+.preview-remove:hover { color: var(--text); border-color: var(--dim); }
+
+/* ─── Face detection canvas overlay ────────────────────── */
+#face-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  border-radius: 12px;
+}
+
+/* ─── Controls ─────────────────────────────────────────── */
+.controls { display: flex; gap: 10px; width: 100%; }
+
+.btn {
+  flex: 1;
+  padding: 14px;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s;
+  outline: none;
+}
+.btn:active:not(:disabled) { transform: scale(0.97); }
+.btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.btn-primary {
+  background: var(--accent);
+  color: #000;
+}
+.btn-ghost {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+.btn-ghost:hover:not(:disabled) { border-color: var(--dim); color: var(--text); }
+
+/* ─── Status line ──────────────────────────────────────── */
+#status {
+  min-height: 20px;
+  font-size: 0.78rem;
+  color: var(--dim);
+  letter-spacing: 0.05em;
+  text-align: center;
+  font-family: "SF Mono", "Fira Code", monospace;
+}
+#status.working { color: var(--accent); }
+#status.err { color: var(--critical); }
+
+/* ─── Results ──────────────────────────────────────────── */
+#results {
+  display: none;
+  opacity: 0;
+  margin-top: 40px;
+  animation: fade-up 0.5s ease forwards;
+}
+#results.visible { display: block; }
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* section label */
+.label {
+  font-family: "SF Mono", "Fira Code", monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-bottom: 10px;
+  margin-top: 36px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 4px;
+}
+.label::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, var(--border) 0%, transparent 100%);
+}
+
+/* ─── Score ring ───────────────────────────────────────── */
+.score-area {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px 24px;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+}
+.score-area:hover {
+  border-color: rgba(0,255,136,0.18);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.35);
+  transform: translateY(-1px);
+}
+
+.ring-wrap { position: relative; flex-shrink: 0; }
+.ring-wrap svg { display: block; overflow: visible; filter: drop-shadow(0 0 0px transparent); transition: filter 0.6s ease; }
+.ring-wrap.level-low      svg { filter: drop-shadow(0 0 12px rgba(0,255,136,0.55)); }
+.ring-wrap.level-moderate svg { filter: drop-shadow(0 0 10px rgba(255,204,0,0.45)); }
+.ring-wrap.level-high     svg { filter: drop-shadow(0 0 10px rgba(255,102,0,0.45)); }
+.ring-wrap.level-critical svg { filter: drop-shadow(0 0 12px rgba(255,34,34,0.55)); }
+
+.ring-track {
+  fill: none;
+  stroke: #1a1a1a;
+  stroke-width: 6;
+}
+.ring-fill {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 6;
+  stroke-linecap: round;
+  transform: rotate(-90deg);
+  transform-origin: center;
+  stroke-dasharray: 339.3;
+  stroke-dashoffset: 339.3;
+  transition: stroke-dashoffset 1.4s cubic-bezier(0.25,0.46,0.45,0.94),
+              stroke 0.5s ease;
+}
+
+.ring-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.ring-score {
+  font-family: "SF Mono", "Fira Code", monospace;
+  font-size: 1.7rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1;
+}
+.ring-max {
+  font-family: "SF Mono", "Fira Code", monospace;
+  font-size: 0.6rem;
+  color: var(--dim);
+  margin-top: 2px;
+}
+
+.score-meta { flex: 1; min-width: 0; }
+.risk-level-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-family: "SF Mono", "Fira Code", monospace;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  background: rgba(0,255,136,0.08);
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  margin-bottom: 10px;
+}
+.meta-row {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.meta-item .mi-label {
+  font-size: 0.65rem;
+  color: var(--dim);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-family: "SF Mono", "Fira Code", monospace;
+}
+.meta-item .mi-value {
+  font-family: "SF Mono", "Fira Code", monospace;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-top: 2px;
+}
+
+/* ─── Wellness bars ────────────────────────────────────── */
+.wellness-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 18px 20px;
+  margin-top: 12px;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+}
+.wellness-bars:hover {
+  border-color: rgba(0,255,136,0.15);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  transform: translateY(-1px);
+}
+.wbar-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.wbar-label {
+  font-family: "SF Mono", "Fira Code", monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--dim);
+  width: 84px;
+  flex-shrink: 0;
+}
+.wbar-track {
+  flex: 1;
+  height: 6px;
+  background: #1a1a1a;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.wbar-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--accent);
+  width: 0%;
+  transition: width 1.2s cubic-bezier(0.25,0.46,0.45,0.94), background 0.4s ease;
+}
+.wbar-pct {
+  font-family: "SF Mono", "Fira Code", monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text);
+  width: 36px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* ─── First-session notice ──────────────────────────────── */
+.first-session-msg {
+  font-family: "SF Mono", "Fira Code", monospace;
+  font-size: 0.75rem;
+  color: var(--dim);
+  letter-spacing: 0.06em;
+  padding: 12px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  text-align: center;
+}
+
+/* ─── Session comparison ───────────────────────────────── */
+.compare-row { display: flex; gap: 10px; align-items: stretch; }
+.compare-card {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px 16px 16px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+}
+.compare-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--border);
+  transition: background 0.4s;
+}
+.compare-card.cc-card-current::before { background: rgba(0,255,136,0.45); }
+.compare-card:hover {
+  border-color: rgba(255,255,255,0.08);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(0,0,0,0.35);
+}
+.compare-card .cc-label {
+  font-family: "SF Mono", "Fira Code", monospace;
+  font-size: 0.62rem;
+  color: var(--dim);
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  margin-bottom: 8px;
+}
+.compare-card .cc-score {
+  font-family: "SF Mono", "Fira Code", monospace;
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 4px 0;
+}
+.compare-card .cc-level {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+.compare-card .cc-time {
+  font-size: 0.65rem;
+  color: var(--dim);
+  font-family: "SF Mono", "Fira Code", monospace;
+  margin-top: 4px;
+}
+.cc-current { color: var(--accent); }
+.cc-previous { color: var(--muted); }
+.cc-previous.no-data { color: var(--dim); }
+
+/* Delta badge */
+.delta-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  flex-shrink: 0;
+}
+.delta-badge {
+  font-family: "SF Mono", "Fira Code", monospace;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 6px 8px;
+  border-radius: 8px;
+  text-align: center;
+  line-height: 1.3;
+}
+.delta-better { background: rgba(0,255,136,0.1); color: var(--low); }
+.delta-worse  { background: rgba(255,34,34,0.1);  color: var(--critical); }
+.delta-same   { background: rgba(85,85,85,0.15);  color: var(--dim); }
+
+/* ─── Megan message ────────────────────────────────────── */
+.megan-box {
+  background: #001a0e;
+  border-left: 3px solid var(--accent);
+  border-radius: 0 10px 10px 0;
+  padding: 16px 18px;
+  color: #99ffcc;
+  font-size: 0.93rem;
+  line-height: 1.7;
+  position: relative;
+  transition: border-left-color 0.2s, box-shadow 0.2s;
+}
+.megan-box:hover {
+  box-shadow: -2px 0 12px rgba(0,255,136,0.15), 0 4px 20px rgba(0,0,0,0.3);
+}
+.megan-speaker {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--accent);
+  opacity: 0.5;
+  font-size: 1rem;
+  padding: 2px;
+  transition: opacity 0.15s;
+  line-height: 1;
+}
+.megan-speaker:hover { opacity: 1; }
+.megan-speaker.speaking { opacity: 1; animation: blink 0.9s infinite; }
+@keyframes blink { 0%,100%{ opacity:1; } 50%{ opacity:0.2; } }
+
+/* ─── Actions / Observations ───────────────────────────── */
+.item-list { display: flex; flex-direction: column; gap: 6px; }
+.list-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 13px;
+  background: var(--surface);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--text);
+  animation: fade-up 0.4s ease both;
+  transition: background 0.15s, border-color 0.15s, transform 0.15s;
+}
+.list-item:hover {
+  background: #161616;
+  border-color: var(--border);
+  transform: translateX(3px);
+}
+.list-item .li-icon {
+  color: var(--accent);
+  font-family: "SF Mono", "Fira Code", monospace;
+  font-size: 0.75rem;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+.obs-item .li-icon { color: var(--dim); }
+
+.list-item:nth-child(1) { animation-delay: 0.05s; }
+.list-item:nth-child(2) { animation-delay: 0.10s; }
+.list-item:nth-child(3) { animation-delay: 0.15s; }
+.list-item:nth-child(4) { animation-delay: 0.20s; }
+.list-item:nth-child(5) { animation-delay: 0.25s; }
+
+/* ─── Scenario ─────────────────────────────────────────── */
+.scenario-text {
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.7;
+  padding: 12px 0;
+}
+
+/* ─── Scan line (preview during analysis) ──────────────── */
+.preview-wrap.scanning { overflow: hidden; }
+.preview-wrap.scanning::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent 0%, #00ff88 40%, #00ff88 60%, transparent 100%);
+  box-shadow: 0 0 10px 2px rgba(0,255,136,0.5);
+  animation: scan-sweep 1.6s linear infinite;
+  z-index: 2;
+  pointer-events: none;
+}
+@keyframes scan-sweep {
+  0%   { top: 0%; }
+  100% { top: 100%; }
+}
+
+/* ─── Analyze button pulse (ready state) ───────────────── */
+@keyframes btn-pulse {
+  0%, 100% { box-shadow: 0 0 0 0   rgba(0,255,136,0.5); }
+  50%       { box-shadow: 0 0 0 10px rgba(0,255,136,0);   }
+}
+.btn-primary.ready {
+  animation: btn-pulse 1.8s ease-in-out infinite;
+}
+
+/* ─── Disclaimer ────────────────────────────────────────── */
+.disclaimer {
+  margin-top: 48px;
+  padding: 0 16px;
+  font-family: "SF Mono", "Fira Code", monospace;
+  font-size: 0.62rem;
+  color: var(--dim);
+  text-align: center;
+  letter-spacing: 0.06em;
+  line-height: 1.7;
+  max-width: 400px;
+}
+
+/* ─── Spinner ───────────────────────────────────────────── */
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ─── Confidence arc ────────────────────────────────────── */
+.conf-wrap { display: flex; align-items: center; gap: 7px; }
+.conf-track { fill: none; stroke: #1a1a1a; stroke-width: 3; }
+.conf-fill {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 3;
+  stroke-linecap: round;
+  transform: rotate(-90deg);
+  transform-origin: center;
+  stroke-dasharray: 69.12; /* 2π × 11 */
+  stroke-dashoffset: 69.12;
+  transition: stroke-dashoffset 1s cubic-bezier(0.25,0.46,0.45,0.94), stroke 0.4s ease;
+}
+
+/* ─── Wellness trend chart ──────────────────────────────── */
+.trend-wrap {
+  margin-top: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px 10px;
+  transition: border-color 0.2s;
+}
+.trend-wrap:hover { border-color: rgba(0,255,136,0.15); }
+.trend-wrap svg { width: 100%; height: 54px; overflow: visible; display: block; }
+
+/* ─── Megan pulse dot ───────────────────────────────────── */
+@keyframes megan-pulse {
+  0%, 100% { transform: scale(1);   box-shadow: 0 0 0 0   rgba(0,255,136,0.7); }
+  50%       { transform: scale(1.4); box-shadow: 0 0 0 5px rgba(0,255,136,0); }
+}
+.megan-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  display: inline-block;
+  opacity: 0;
+  transition: opacity 0.3s;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+.megan-dot.active { opacity: 1; animation: megan-pulse 1s ease-in-out infinite; }
+
+/* ─── Photo counter ─────────────────────────────────────── */
+.header-counter {
+  position: absolute;
+  top: 0; right: 0;
+  font-family: "SF Mono", "Fira Code", monospace;
+  font-size: 0.62rem;
+  color: var(--dim);
+  letter-spacing: 0.05em;
+  padding: 4px 9px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  white-space: nowrap;
+  animation: page-fade-in 0.5s ease forwards;
+}
+.header-counter .hc-count { color: var(--accent); font-weight: 700; }
+
+/* ─── Mobile tweaks ─────────────────────────────────────── */
+@media (max-width: 420px) {
+  .score-area { flex-direction: column; align-items: flex-start; gap: 16px; }
+  .ring-wrap svg { width: 100px; height: 100px; }
+  .ring-score { font-size: 1.4rem; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Header -->
+  <header style="position:relative">
+    <div class="header-counter" id="photo-counter" style="display:none">
+      <span class="hc-count" id="photo-count">0</span> analyzed today
+    </div>
+    <h1>Mirror</h1>
+    <p>Preventive Health AI — Powered by Megan</p>
+  </header>
+
+  <!-- Upload -->
+  <div class="upload-section">
+
+    <div class="upload-zone" id="upload-zone">
+      <input type="file" id="file-input" accept="image/*">
+      <div class="upload-icon">⬆</div>
+      <div class="upload-label">
+        <strong>Drop your photo here</strong>
+        or <span style="color:var(--accent)">click to browse</span><br>
+        <span style="font-size:0.75rem;opacity:0.6">JPG · PNG · HEIC &nbsp;—&nbsp; face clearly visible</span>
+      </div>
+    </div>
+
+    <div class="preview-wrap" id="preview-wrap">
+      <img id="preview-img" alt="Selected photo">
+      <canvas id="face-canvas"></canvas>
+      <button class="preview-remove" id="btn-remove" title="Remove">✕</button>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-primary" id="btn-analyze" disabled>Analyze</button>
+      <button class="btn btn-ghost"   id="btn-new" style="display:none">New Photo</button>
+    </div>
+
+    <div id="status"></div>
+  </div>
+
+  <!-- Results -->
+  <div id="results">
+
+    <div class="label">Wellness Snapshot</div>
+    <div class="score-area">
+      <div class="ring-wrap">
+        <svg width="120" height="120" viewBox="0 0 120 120">
+          <circle class="ring-track" cx="60" cy="60" r="54"/>
+          <circle class="ring-fill" id="ring-fill" cx="60" cy="60" r="54"/>
+        </svg>
+        <div class="ring-label">
+          <div class="ring-score" id="r-score">—</div>
+          <div class="ring-max">/100</div>
+        </div>
+      </div>
+      <div class="score-meta">
+        <div class="risk-level-badge" id="r-level">—</div>
+        <div class="meta-row">
+          <div class="meta-item">
+            <div class="mi-label">Confidence</div>
+            <div class="conf-wrap">
+              <svg width="28" height="28" viewBox="0 0 28 28">
+                <circle class="conf-track" cx="14" cy="14" r="11"/>
+                <circle class="conf-fill" id="conf-fill" cx="14" cy="14" r="11"/>
+              </svg>
+              <div class="mi-value" id="r-conf">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="wellness-bars">
+      <div class="wbar-row">
+        <div class="wbar-label">Fatigue</div>
+        <div class="wbar-track"><div class="wbar-fill" id="bar-fatigue"></div></div>
+        <div class="wbar-pct" id="pct-fatigue">—</div>
+      </div>
+      <div class="wbar-row">
+        <div class="wbar-label">Stress</div>
+        <div class="wbar-track"><div class="wbar-fill" id="bar-stress"></div></div>
+        <div class="wbar-pct" id="pct-stress">—</div>
+      </div>
+      <div class="wbar-row">
+        <div class="wbar-label">Dehydration</div>
+        <div class="wbar-track"><div class="wbar-fill" id="bar-dehydration"></div></div>
+        <div class="wbar-pct" id="pct-dehydration">—</div>
+      </div>
+    </div>
+
+    <div class="label">Session Comparison</div>
+    <div id="first-session-msg" class="first-session-msg" style="display:none">
+      First Session — no previous data to compare.
+    </div>
+    <div class="compare-row" id="compare-row">
+      <div class="compare-card">
+        <div class="cc-label">Last Session</div>
+        <div class="cc-score cc-previous" id="prev-score">—</div>
+        <div class="cc-level" id="prev-level"></div>
+        <div class="cc-time"  id="prev-time"></div>
+      </div>
+      <div class="delta-wrap">
+        <div class="delta-badge delta-same" id="delta-badge">—</div>
+      </div>
+      <div class="compare-card cc-card-current">
+        <div class="cc-label">This Session</div>
+        <div class="cc-score cc-current" id="c-score">—</div>
+        <div class="cc-level" id="c-level"></div>
+        <div class="cc-time" style="color:var(--dim);font-family:'SF Mono',monospace;font-size:0.65rem;margin-top:4px">now</div>
+      </div>
+    </div>
+    <div class="trend-wrap" id="trend-wrap" style="display:none">
+      <svg id="trend-svg" viewBox="0 0 300 54" preserveAspectRatio="none"></svg>
+    </div>
+
+    <div class="label">Megan <span class="megan-dot" id="megan-dot"></span></div>
+    <div class="megan-box" id="megan-box">
+      <button class="megan-speaker" id="btn-speak" title="Replay message" aria-label="Speak">🔊</button>
+      <span id="megan-msg"></span>
+    </div>
+
+    <div class="label">Immediate Actions</div>
+    <div class="item-list" id="actions-list"></div>
+
+    <div id="scenario-section" style="display:none">
+      <div class="label">Path Forward</div>
+      <p class="scenario-text" id="scenario-text"></p>
+    </div>
+
+    <div id="obs-section" style="display:none">
+      <div class="label">Key Observations</div>
+      <div class="item-list" id="obs-list"></div>
+    </div>
+
+  </div><!-- /results -->
+</div><!-- /wrap -->
+
+<p class="disclaimer">
+  MIRROR does not provide medical diagnosis.<br>For informational purposes only.
+</p>
+
+<script>
+/* ─── Elements ─────────────────────────────────────── */
+const uploadZone = document.getElementById('upload-zone');
+const fileInput  = document.getElementById('file-input');
+const previewWrap = document.getElementById('preview-wrap');
+const previewImg  = document.getElementById('preview-img');
+const btnRemove  = document.getElementById('btn-remove');
+const btnAnalyze = document.getElementById('btn-analyze');
+const btnNew     = document.getElementById('btn-new');
+const btnSpeak   = document.getElementById('btn-speak');
+const statusEl   = document.getElementById('status');
+const resultsEl  = document.getElementById('results');
+const ringFill   = document.getElementById('ring-fill');
+const meganDot   = document.getElementById('megan-dot');
+
+/* ─── Photo counter (localStorage) ─────────────────── */
+const _todayKey = () => 'mirror_today_' + new Date().toISOString().slice(0, 10);
+function getTodayCount() { return parseInt(localStorage.getItem(_todayKey()) || '0', 10); }
+function incrementTodayCount() {
+  const n = getTodayCount() + 1;
+  localStorage.setItem(_todayKey(), n);
+  return n;
+}
+(function initCounter() {
+  const n = getTodayCount();
+  if (n > 0) {
+    document.getElementById('photo-count').textContent = n;
+    document.getElementById('photo-counter').style.display = 'block';
+  }
+})();
+
+/* ─── Session history (localStorage) ───────────────── */
+const HISTORY_KEY = 'mirror_history';
+function loadHistory() {
+  try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); } catch { return []; }
+}
+function pushHistory(score) {
+  const h = loadHistory();
+  h.push({ s: score, t: Date.now() });
+  if (h.length > 10) h.splice(0, h.length - 10);
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(h));
+  return h;
+}
+function drawTrend(history) {
+  const svg   = document.getElementById('trend-svg');
+  const wrap  = document.getElementById('trend-wrap');
+  if (history.length < 2) { wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  const pts = history.slice(-5);
+  const N   = pts.length;
+  const W = 300, H = 54, padX = 18, padY = 8;
+  const xOf = i => padX + (i / (N - 1)) * (W - padX * 2);
+  // lower score = better, so high score = bottom of chart
+  const yOf = s => padY + (s / 100) * (H - padY * 2);
+
+  let polyline = '';
+  let dots = '';
+  let labels = '';
+  pts.forEach((p, i) => {
+    const x = xOf(i), y = yOf(p.s);
+    polyline += `${x},${y} `;
+    const isLast = i === N - 1;
+    const r = isLast ? 4.5 : 3;
+    const fill = isLast ? '#00ff88' : '#1e1e1e';
+    const stroke = isLast ? '#00ff88' : 'rgba(0,255,136,0.5)';
+    dots += `<circle cx="${x}" cy="${y}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>`;
+    if (isLast || i === 0) {
+      const anchor = i === 0 ? 'start' : 'end';
+      labels += `<text x="${x}" y="${H}" text-anchor="${anchor}" font-family="SF Mono,monospace" font-size="8" fill="rgba(85,85,85,0.8)">${p.s}</text>`;
+    }
+  });
+
+  svg.innerHTML = `
+    <polyline points="${polyline.trim()}" fill="none" stroke="rgba(0,255,136,0.35)" stroke-width="1.5" stroke-linejoin="round"/>
+    <polyline points="${polyline.trim()}" fill="none" stroke="rgba(0,255,136,0.12)" stroke-width="6" stroke-linejoin="round"/>
+    ${dots}${labels}`;
+}
+
+const CIRC = 2 * Math.PI * 54; // 339.3
+
+let capturedDataUrl = null;
+let lastMeganMsg    = '';
+let lastSpeechText  = '';
+let faceBoxRaf      = null;
+let faceApiLoaded   = false;
+
+/* ─── Upload / preview ─────────────────────────────── */
+fileInput.addEventListener('change', () => {
+  const file = fileInput.files[0];
+  if (file) loadFile(file);
+});
+
+uploadZone.addEventListener('dragover', e => {
+  e.preventDefault();
+  uploadZone.classList.add('drag-over');
+});
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+uploadZone.addEventListener('drop', e => {
+  e.preventDefault();
+  uploadZone.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('image/')) loadFile(file);
+});
+
+function loadFile(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    capturedDataUrl = e.target.result;
+    previewImg.src = capturedDataUrl;
+    uploadZone.style.display = 'none';
+    previewWrap.style.display = 'block';
+    btnAnalyze.disabled = false;
+    btnAnalyze.classList.add('ready');
+    setStatus('');
+  };
+  reader.readAsDataURL(file);
+}
+
+btnRemove.addEventListener('click', resetUpload);
+
+function resetUpload() {
+  capturedDataUrl = null;
+  fileInput.value = '';
+  previewImg.src = '';
+  previewWrap.style.display = 'none';
+  uploadZone.style.display = 'block';
+  btnAnalyze.disabled = true;
+  btnAnalyze.classList.remove('ready');
+  btnAnalyze.style.display = 'block';
+  btnNew.style.display = 'none';
+  previewWrap.classList.remove('scanning');
+  stopFaceBox();
+  resultsEl.classList.remove('visible');
+  resultsEl.style.display = 'none';
+  setStatus('');
+  stopAudio();
+}
+
+btnNew.addEventListener('click', resetUpload);
+
+/* ─── Status ───────────────────────────────────────── */
+function setStatus(msg, cls = '') {
+  statusEl.className = cls;
+  statusEl.innerHTML = msg;
+}
+
+const SPIN = '<span style="display:inline-block;width:10px;height:10px;border:2px solid #1a1a1a;border-top-color:var(--accent);border-radius:50%;animation:spin 0.7s linear infinite;margin-right:6px;vertical-align:middle"></span>';
+
+/* ─── Face detection ───────────────────────────────── */
+function stopFaceBox() {
+  if (faceBoxRaf) { cancelAnimationFrame(faceBoxRaf); faceBoxRaf = null; }
+  const canvas = document.getElementById('face-canvas');
+  if (canvas) canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+}
+
+function coverScale(img) {
+  const nw = img.naturalWidth,  nh = img.naturalHeight;
+  const dw = img.offsetWidth,   dh = img.offsetHeight;
+  const scale = Math.max(dw / nw, dh / nh);
+  return { scale, ox: (dw - nw * scale) / 2, oy: (dh - nh * scale) / 2 };
+}
+
+function startFaceBox(box) {
+  const canvas = document.getElementById('face-canvas');
+  const img    = previewImg;
+  canvas.width  = img.offsetWidth;
+  canvas.height = img.offsetHeight;
+
+  const { scale, ox, oy } = coverScale(img);
+  const x = box.x * scale + ox;
+  const y = box.y * scale + oy;
+  const w = box.width  * scale;
+  const h = box.height * scale;
+  const cl = Math.min(w, h) * 0.18; // corner length
+
+  const ctx      = canvas.getContext('2d');
+  const t0       = performance.now();
+  const DRAW_DUR = 0.45; // seconds for corners to draw in
+
+  function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+
+  function draw() {
+    const t        = (performance.now() - t0) / 1000;
+    const progress = Math.min(t / DRAW_DUR, 1);
+    const eased    = easeOutCubic(progress);
+    const postDur  = Math.max(t - DRAW_DUR, 0);
+    const pulse    = progress < 1 ? 0 : 0.5 + 0.5 * Math.sin(postDur * Math.PI * 2 * 1.2);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    ctx.save();
+    // Bounding rect fades in with corners
+    ctx.strokeStyle = '#00ff88';
+    ctx.globalAlpha = (0.35 + 0.25 * pulse) * eased;
+    ctx.lineWidth   = 1.5;
+    ctx.shadowColor = '#00ff88';
+    ctx.shadowBlur  = (4 + 8 * pulse) * eased;
+    ctx.strokeRect(x, y, w, h);
+
+    // Corner brackets draw in from corner outward
+    const curCl     = cl * eased;
+    ctx.globalAlpha = (0.8 + 0.2 * pulse) * eased;
+    ctx.lineWidth   = 3;
+    ctx.shadowBlur  = (8 + 14 * pulse) * eased;
+    [
+      [x,   y,    1,  1],
+      [x+w, y,   -1,  1],
+      [x,   y+h,  1, -1],
+      [x+w, y+h, -1, -1],
+    ].forEach(([cx, cy, dx, dy]) => {
+      ctx.beginPath();
+      ctx.moveTo(cx + dx * curCl, cy);
+      ctx.lineTo(cx, cy);
+      ctx.lineTo(cx, cy + dy * curCl);
+      ctx.stroke();
+    });
+    ctx.restore();
+
+    faceBoxRaf = requestAnimationFrame(draw);
+  }
+  faceBoxRaf = requestAnimationFrame(draw);
+}
+
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src; s.onload = resolve; s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+
+async function detectFaces(imgEl) {
+  // Wait for the image to be fully decoded
+  if (!imgEl.complete || !imgEl.naturalWidth) {
+    await new Promise(r => { imgEl.onload = r; });
+  }
+
+  // 1. Try native FaceDetector (Chrome on supported platforms)
+  if ('FaceDetector' in window) {
+    try {
+      const fd    = new FaceDetector({ fastMode: true, maxDetectedFaces: 1 });
+      const faces = await fd.detect(imgEl);
+      if (faces.length > 0) {
+        const b = faces[0].boundingBox;
+        return { x: b.x, y: b.y, width: b.width, height: b.height };
+      }
+      return null; // native worked, no face found
+    } catch (e) {
+      console.warn('[face] native FaceDetector error, falling back:', e.message);
+    }
+  }
+
+  // 2. Fallback: face-api.js tiny face detector via CDN
+  if (!faceApiLoaded) {
+    setStatus(SPIN + 'Loading face detection…', 'working');
+    await loadScript('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js');
+    await faceapi.nets.tinyFaceDetector.loadFromUri('/static/weights');
+    faceApiLoaded = true;
+  }
+
+  const opts       = new faceapi.TinyFaceDetectorOptions({ scoreThreshold: 0.4, inputSize: 320 });
+  const detections = await faceapi.detectAllFaces(imgEl, opts);
+  if (detections.length === 0) return null;
+  const b = detections[0].box;
+  return { x: b.x, y: b.y, width: b.width, height: b.height };
+}
+
+/* ─── Analyze ──────────────────────────────────────── */
+btnAnalyze.addEventListener('click', async () => {
+  if (!capturedDataUrl) return;
+
+  btnAnalyze.disabled = true;
+  btnAnalyze.classList.remove('ready');
+  btnAnalyze.style.display = 'none';
+  btnNew.style.display = 'block';
+  btnNew.disabled = true;
+
+  setStatus(SPIN + 'Detecting face…', 'working');
+
+  let box = null;
+  try {
+    box = await detectFaces(previewImg);
+  } catch (e) {
+    console.warn('[face] detection threw, proceeding without box:', e.message);
+    box = {}; // detection failed outright — don't block the demo
+  }
+
+  if (box === null) {
+    // Definitive "no face found" result
+    setStatus('No face detected — please upload a clear photo.', 'err');
+    btnAnalyze.disabled = false;
+    btnAnalyze.classList.add('ready');
+    btnAnalyze.style.display = 'block';
+    btnNew.style.display = 'none';
+    btnNew.disabled = false;
+    return;
+  }
+
+  // Face found (or detection errored gracefully) — show box + message
+  if (box.width) startFaceBox(box);
+  previewWrap.classList.add('scanning');
+  setStatus('Face detected — analyzing…', 'working');
+
+  await new Promise(r => setTimeout(r, 1500));
+
+  setStatus(SPIN + 'Analyzing…', 'working');
+
+  try {
+    const res = await fetch('/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: capturedDataUrl }),
+    });
+    if (!res.ok) throw new Error('Server error ' + res.status);
+    const d = await res.json();
+    render(d);
+    setStatus('');
+  } catch (err) {
+    setStatus('Analysis failed — ' + err.message, 'err');
+    btnAnalyze.disabled = false;
+    btnAnalyze.classList.add('ready');
+    btnAnalyze.style.display = 'block';
+    btnNew.style.display = 'none';
+  } finally {
+    stopFaceBox();
+    previewWrap.classList.remove('scanning');
+    btnNew.disabled = false;
+  }
+});
+
+/* ─── Risk color ───────────────────────────────────── */
+const LEVEL_COLOR = {
+  LOW:      'var(--low)',
+  MODERATE: 'var(--moderate)',
+  HIGH:     'var(--high)',
+  CRITICAL: 'var(--critical)',
+};
+const LEVEL_BG = {
+  LOW:      'rgba(0,255,136,0.08)',
+  MODERATE: 'rgba(255,204,0,0.08)',
+  HIGH:     'rgba(255,102,0,0.08)',
+  CRITICAL: 'rgba(255,34,34,0.08)',
+};
+function levelColor(level) {
+  return LEVEL_COLOR[(level || '').toUpperCase()] || 'var(--accent)';
+}
+function levelBg(level) {
+  return LEVEL_BG[(level || '').toUpperCase()] || 'rgba(0,255,136,0.08)';
+}
+
+/* ─── Wellness bar scoring ─────────────────────────── */
+function fatigueScore(fatigue_level) {
+  const map = { LOW: 25, MODERATE: 60, HIGH: 85 };
+  return map[(fatigue_level || '').toUpperCase()] ?? 50;
+}
+
+function stressScore(stress_indicators) {
+  const indicators = stress_indicators || [];
+  const text = indicators.join(' ').toLowerCase();
+  let score;
+  if      (indicators.length === 0) score = 20;
+  else if (indicators.length === 1) score = 35;
+  else if (indicators.length === 2) score = 55;
+  else                               score = 75;
+  if (/severe|high stress|significant|extreme/.test(text)) score = Math.min(score + 15, 95);
+  if (/mild|slight|minimal|low stress/.test(text))         score = Math.max(score - 15, 10);
+  return score;
+}
+
+function dehydrationScore(key_observations) {
+  const text = (key_observations || []).join(' ').toLowerCase();
+  if (/severely dehydrat|very dry|extreme.*dry/.test(text)) return 75;
+  if (/dehydrat|dry (skin|lips|mouth)|pale|dull skin|chapped/.test(text)) return 55;
+  return 40;
+}
+
+function setBar(fillId, pctId, score) {
+  const color = score >= 66 ? 'var(--high)' : score >= 41 ? 'var(--moderate)' : 'var(--low)';
+  const fill = document.getElementById(fillId);
+  const pct  = document.getElementById(pctId);
+  // Reset to 0 first so transition always fires from 0 → value
+  fill.style.transition = 'none';
+  fill.style.width = '0%';
+  void fill.getBoundingClientRect();
+  setTimeout(() => {
+    fill.style.transition = '';
+    fill.style.width      = score + '%';
+    fill.style.background = color;
+  }, 80);
+  pct.textContent = score + '%';
+  pct.style.color = color;
+}
+
+/* ─── Render results ───────────────────────────────── */
+function render(d) {
+  const score = d.risk_score ?? 0;
+  const level = (d.risk_level || '—').toUpperCase();
+  const color = levelColor(level);
+
+  // Score ring
+  const offset = CIRC * (1 - score / 100);
+  ringFill.style.transition = 'none';
+  ringFill.style.strokeDashoffset = CIRC;
+  void ringFill.getBoundingClientRect();
+  requestAnimationFrame(() => {
+    ringFill.style.transition = '';
+    ringFill.style.strokeDashoffset = offset;
+    ringFill.style.stroke = color;
+  });
+  document.querySelector('.ring-wrap').className = 'ring-wrap level-' + level.toLowerCase();
+
+  document.getElementById('r-score').textContent = score;
+
+  // Confidence arc
+  const confVal   = d.confidence != null ? Math.round(d.confidence) : 0;
+  const confColor = confVal >= 80 ? 'var(--low)' : confVal >= 60 ? 'var(--moderate)' : confVal >= 40 ? 'var(--high)' : 'var(--critical)';
+  const CONF_CIRC = 2 * Math.PI * 11; // 69.12
+  const confFill  = document.getElementById('conf-fill');
+  confFill.style.transition = 'none';
+  confFill.style.strokeDashoffset = CONF_CIRC;
+  void confFill.getBoundingClientRect();
+  requestAnimationFrame(() => {
+    confFill.style.transition = '';
+    confFill.style.strokeDashoffset = CONF_CIRC * (1 - confVal / 100);
+    confFill.style.stroke = confColor;
+  });
+  const confEl = document.getElementById('r-conf');
+  confEl.textContent = d.confidence != null ? confVal + '%' : '—';
+  confEl.style.color = confColor;
+
+  const badge = document.getElementById('r-level');
+  badge.textContent = level;
+  badge.style.color       = color;
+  badge.style.borderColor = color;
+  badge.style.background  = levelBg(level);
+
+  // Current session column
+  document.getElementById('c-score').textContent = score;
+  document.getElementById('c-level').textContent = level;
+
+  // Wellness bars — prefer direct scores from analyzer, fall back to derived
+  setBar('bar-fatigue',     'pct-fatigue',     d.fatigue_score     ?? fatigueScore(d.fatigue_level));
+  setBar('bar-stress',      'pct-stress',      d.stress_score      ?? stressScore(d.stress_indicators));
+  setBar('bar-dehydration', 'pct-dehydration', d.dehydration_score ?? dehydrationScore(d.key_observations));
+
+  // Session comparison — only show if previous session has a valid score
+  const prev = d.previous_session;
+  const compareRow   = document.getElementById('compare-row');
+  const firstMsg     = document.getElementById('first-session-msg');
+  const hasPrev      = prev && prev.risk_score > 0;
+
+  if (hasPrev) {
+    compareRow.style.display = 'flex';
+    firstMsg.style.display   = 'none';
+
+    const prevScore = prev.risk_score;
+    const prevLevel = (prev.risk_level || '').toUpperCase();
+    const prevScoreEl = document.getElementById('prev-score');
+    const prevLevelEl = document.getElementById('prev-level');
+    const prevTimeEl  = document.getElementById('prev-time');
+    const deltaEl     = document.getElementById('delta-badge');
+
+    prevScoreEl.textContent = prevScore;
+    prevLevelEl.textContent = prevLevel;
+    prevScoreEl.className   = 'cc-score cc-previous';
+
+    if (prev.timestamp) {
+      const ts = new Date(prev.timestamp.replace(' ', 'T'));
+      prevTimeEl.textContent = isNaN(ts) ? prev.timestamp : formatTime(ts);
+    }
+
+    const diff = prevScore - score;
+    if (diff > 0) {
+      deltaEl.textContent = `▼${diff}\nbetter`;
+      deltaEl.className = 'delta-badge delta-better';
+    } else if (diff < 0) {
+      deltaEl.textContent = `▲${Math.abs(diff)}\nhigher`;
+      deltaEl.className = 'delta-badge delta-worse';
+    } else {
+      deltaEl.textContent = '=\nsame';
+      deltaEl.className = 'delta-badge delta-same';
+    }
+  } else {
+    compareRow.style.display = 'none';
+    firstMsg.style.display   = 'block';
+  }
+
+  // Megan message
+  const meganMsg = d.megan_message || '';
+  document.getElementById('megan-msg').textContent = meganMsg;
+  lastMeganMsg = meganMsg;
+
+  // Actions
+  const actionsList = document.getElementById('actions-list');
+  actionsList.innerHTML = '';
+  (d.immediate_actions || []).forEach((a, i) => {
+    actionsList.insertAdjacentHTML('beforeend',
+      `<div class="list-item" style="opacity:0;animation:fade-up 0.4s ease ${0.1 + i * 0.1}s forwards">
+         <span class="li-icon">✦</span><span>${esc(a)}</span>
+       </div>`);
+  });
+
+  // Scenario
+  const scenSec = document.getElementById('scenario-section');
+  if (d.scenario_improvement) {
+    document.getElementById('scenario-text').textContent = d.scenario_improvement;
+    scenSec.style.display = 'block';
+  } else {
+    scenSec.style.display = 'none';
+  }
+
+  // Observations
+  const obsList = document.getElementById('obs-list');
+  const obsSec  = document.getElementById('obs-section');
+  obsList.innerHTML = '';
+  if (d.key_observations && d.key_observations.length) {
+    d.key_observations.forEach((o, i) => {
+      obsList.insertAdjacentHTML('beforeend',
+        `<div class="list-item obs-item" style="animation-delay:${0.05 + i * 0.07}s">
+           <span class="li-icon">·</span><span>${esc(o)}</span>
+         </div>`);
+    });
+    obsSec.style.display = 'block';
+  } else {
+    obsSec.style.display = 'none';
+  }
+
+  // Trend chart + counter
+  const history = pushHistory(score);
+  drawTrend(history);
+  const todayN = incrementTodayCount();
+  document.getElementById('photo-count').textContent = todayN;
+  document.getElementById('photo-counter').style.display = 'block';
+
+  // Show results
+  resultsEl.style.animation = 'none';
+  resultsEl.style.display   = 'block';
+  void resultsEl.offsetWidth;
+  resultsEl.style.animation = '';
+  resultsEl.classList.add('visible');
+  setTimeout(() => resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+
+  const firstAction = (d.immediate_actions || [])[0] || '';
+  lastSpeechText = firstAction ? `${meganMsg} ${firstAction}.` : meganMsg;
+  setTimeout(() => speakMessage(lastSpeechText), 400);
+}
+
+/* ─── Time format ──────────────────────────────────── */
+function formatTime(date) {
+  const now = new Date();
+  const diffMs = now - date;
+  const diffH  = diffMs / 3600000;
+  if (diffH < 1)   return Math.round(diffMs / 60000) + 'm ago';
+  if (diffH < 24)  return Math.round(diffH) + 'h ago';
+  if (diffH < 168) return Math.round(diffH / 24) + 'd ago';
+  return date.toLocaleDateString();
+}
+
+/* ─── Speech — ElevenLabs primary, Web Speech fallback ── */
+let currentAudio = null;
+
+function stopAudio() {
+  if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+  if ('speechSynthesis' in window) speechSynthesis.cancel();
+  btnSpeak.classList.remove('speaking');
+  meganDot.classList.remove('active');
+}
+
+async function speakMessage(text) {
+  if (!text) return;
+  stopAudio();
+
+  console.log('speakMessage called, text:', text.substring(0, 50));
+
+  btnSpeak.classList.add('speaking');
+  meganDot.classList.add('active');
+
+  // ── 1. ElevenLabs via /speak ──────────────────────────
+  try {
+    console.log('Attempting ElevenLabs /speak fetch...');
+    const res = await fetch('/speak', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+
+    console.log('ElevenLabs response status:', res.status);
+
+    if (res.ok) {
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      currentAudio = new Audio(url);
+      currentAudio.onended = currentAudio.onerror = () => {
+        URL.revokeObjectURL(url);
+        currentAudio = null;
+        btnSpeak.classList.remove('speaking');
+        meganDot.classList.remove('active');
+      };
+      currentAudio.play();
+      return;
+    }
+  } catch (e) {
+    console.log('ElevenLabs failed, falling back:', e.message);
+  }
+
+  // ── 2. Web Speech fallback ────────────────────────────
+  if (!('speechSynthesis' in window)) {
+    btnSpeak.classList.remove('speaking');
+    meganDot.classList.remove('active');
+    return;
+  }
+
+  const utter  = new SpeechSynthesisUtterance(text);
+  utter.rate   = 0.9;
+  utter.pitch  = 1.0;
+  utter.volume = 1.0;
+
+  function pickVoice() {
+    const voices = speechSynthesis.getVoices();
+    const exact  = (name) => voices.find(v => v.name === name);
+    return (
+      exact('Samantha') ||
+      exact('Karen')    ||
+      exact('Moira')    ||
+      voices.find(v => v.name.includes('Google')) ||
+      voices.find(v => v.name.includes('English')) ||
+      voices.find(v => v.lang.startsWith('en-')) ||
+      voices.find(v => v.lang.startsWith('en')) ||
+      null
+    );
+  }
+
+  function trySpeak() {
+    const voice = pickVoice();
+    if (voice) utter.voice = voice;
+    speechSynthesis.speak(utter);
+  }
+
+  utter.onend = utter.onerror = () => {
+    btnSpeak.classList.remove('speaking');
+    meganDot.classList.remove('active');
+  };
+
+  if (speechSynthesis.getVoices().length) {
+    trySpeak();
+  } else {
+    speechSynthesis.addEventListener('voiceschanged', trySpeak, { once: true });
+  }
+}
+
+btnSpeak.addEventListener('click', () => speakMessage(lastSpeechText || lastMeganMsg));
+
+/* ─── Helpers ──────────────────────────────────────── */
+function esc(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
